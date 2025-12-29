@@ -1,39 +1,36 @@
 FROM alpine:latest
 
-# Install dante-server
-RUN apk add --no-cache dante-server
+# Install dante-server and network tools
+RUN apk add --no-cache dante-server iproute2
 
-# Create a minimal working config
-RUN cat > /etc/sockd.conf <<EOF
-# Logging
+# Create a startup script that detects the interface
+RUN cat > /start.sh <<'EOF'
+#!/bin/sh
+
+# Get the default route interface
+INTERFACE=$(ip route | grep default | awk '{print $5}' | head -n1)
+echo "Detected interface: $INTERFACE"
+
+# Create config with detected interface
+cat > /etc/sockd.conf <<CONF
 logoutput: stderr
-
-# Listen on all interfaces
 internal: 0.0.0.0 port = 1080
-
-# Use default route interface
-external.rotation: route
-
-# No authentication
-clientmethod: none
+external: $INTERFACE
 socksmethod: none
+clientmethod: none
+client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 log: error }
+socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 protocol: tcp udp log: error }
+CONF
 
-# Allow all clients
-client pass {
-    from: 0.0.0.0/0 to: 0.0.0.0/0
-    log: error
-}
+echo "Starting sockd with config:"
+cat /etc/sockd.conf
 
-# Allow all SOCKS traffic
-socks pass {
-    from: 0.0.0.0/0 to: 0.0.0.0/0
-    protocol: tcp udp
-    command: bind connect udpassociate
-    log: error
-}
+# Start sockd
+exec sockd -f /etc/sockd.conf -D
 EOF
+
+RUN chmod +x /start.sh
 
 EXPOSE 1080
 
-# Run sockd in debug mode to see errors
-CMD ["sockd", "-f", "/etc/sockd.conf", "-d", "1"]
+CMD ["/start.sh"]
