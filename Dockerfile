@@ -3,7 +3,7 @@ FROM alpine:latest
 # Install Dante SOCKS5 server
 RUN apk add --no-cache dante-server
 
-# Create minimal config
+# Create SOCKS5 configuration
 RUN echo "logoutput: stderr" > /etc/sockd.conf && \
     echo "internal: 0.0.0.0 port = 1080" >> /etc/sockd.conf && \
     echo "external: eth0" >> /etc/sockd.conf && \
@@ -24,5 +24,5 @@ RUN echo "logoutput: stderr" > /etc/sockd.conf && \
 
 EXPOSE 1080
 
-# Start Dante
-CMD ["sockd", "-f", "/etc/sockd.conf", "-N"]
+# Start Dante in foreground mode (daemon mode with -D)
+CMD ["sockd", "-f", "/etc/sockd.conf", "-D"]
