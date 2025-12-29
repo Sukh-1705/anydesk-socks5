@@ -1,36 +1,19 @@
 FROM alpine:latest
 
-# Install dante-server and network tools
-RUN apk add --no-cache dante-server iproute2
+# Install 3proxy (simpler, more reliable)
+RUN apk add --no-cache 3proxy
 
-# Create a startup script that detects the interface
-RUN cat > /start.sh <<'EOF'
-#!/bin/sh
-
-# Get the default route interface
-INTERFACE=$(ip route | grep default | awk '{print $5}' | head -n1)
-echo "Detected interface: $INTERFACE"
-
-# Create config with detected interface
-cat > /etc/sockd.conf <<CONF
-logoutput: stderr
-internal: 0.0.0.0 port = 1080
-external: $INTERFACE
-socksmethod: none
-clientmethod: none
-client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 log: error }
-socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 protocol: tcp udp log: error }
-CONF
-
-echo "Starting sockd with config:"
-cat /etc/sockd.conf
-
-# Start sockd
-exec sockd -f /etc/sockd.conf -D
+# Create minimal config
+RUN cat > /etc/3proxy.cfg <<'EOF'
+# Simple SOCKS5 proxy config
+daemon
+nserver 8.8.8.8
+nscache 65536
+auth none
+allow *
+socks -p1080
 EOF
-
-RUN chmod +x /start.sh
 
 EXPOSE 1080
 
-CMD ["/start.sh"]
+CMD ["3proxy", "/etc/3proxy.cfg"]
